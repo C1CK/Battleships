@@ -1,13 +1,18 @@
-import math
 import time
 import random
 
 
 class tile(object):
+    """Object for all tiles."""
     def __init__(self):
+        """Create blank entity."""
         self.entity = ""
 
     def getImage(self):
+        """
+        Return image to display in terminal.
+        :return: Char.
+        """
         if self.entity == "":
             return "□"
         if self.entity == "ship":
@@ -18,6 +23,10 @@ class tile(object):
             return "■"
 
     def attack(self):
+        """
+        Return True if hit ship and store new cell data.
+        :return: Bool.
+        """
         if self.entity == "ship":
             self.entity = "destroyedShip"
             return True
@@ -29,17 +38,32 @@ class tile(object):
 
 
 class map_(object):
+    """Object for each player's map."""
     def __init__(self, length):
+        """
+        Create array and save length.
+        :param length: Int, length of map array to create
+        """
         self.array = []
         self.length = length
         for x in range(0, length**2):
             self.array.append(tile())
 
     def placeShip(self, startingPos, length, offset):
+        """
+        Place ship onto map array.
+        :param startingPos: Int, position for ship to start.
+        :param length: Int, length of ship.
+        :param offset: Int, whether horizontal or vertical.
+        """
         for i in range(0, length):
             self.array[startingPos + (offset * i)].entity = "ship"
 
     def displayMap(self, shipVis):
+        """
+        Print map onto the screen.
+        :param shipVis: Bool, whether to show unhit ships
+        """
         print(" ", end="")
         for i in range(0, self.length):
             print(i, end="")
@@ -53,6 +77,10 @@ class map_(object):
         print("\n", end="")
 
     def hasShips(self):
+        """
+        return True if this map has sips.
+        :return: Bool.
+        """
         for i in range(0, self.length**2):
             if self.array[i].entity == "ship":
                 return True
@@ -60,12 +88,22 @@ class map_(object):
 
 
 class player(object):
+    """Base class for all players."""
     def __init__(self, lengthOfMap):
+        """
+        Create map class for all child classes.
+        :param lengthOfMap: Int.
+        """
         self.map = map_(lengthOfMap)
 
 
 class AI(player):
+    """Object for AI player, derived from player base class."""
     def __init__(self, lengthOfMap):
+        """
+        Assign name, place ship, create blank list for hits, and create array for tested directions.
+        :param lengthOfMap: Int.
+        """
         super().__init__(lengthOfMap)
         self.__assignName()
         self.__placeShip()
@@ -78,12 +116,11 @@ class AI(player):
         }  # stores info on checked directions in the format left; right; up; down.
 
     def __assignName(self):
+        """Assign a name for the AI"""
         self.name = "AI"
 
     def __placeShip(self):
-        """
-        place own ship with random parameters.
-        """
+        """place own ship with random parameters."""
         shipLoc = random.randint(0, self.map.length ** 2)
         shipOrientation = random.choice(["H", "V"])
         if shipOrientation == "H":
@@ -99,9 +136,9 @@ class AI(player):
     def __chooseValidShifts(self, hitsIndex, targetMap):
         """
         return a list of valid shift, which haven't been checked and don't run off the end of the map
-        :param hitsIndex: index location of hit to check.
-        :param targetMap: map class.
-        :return: list of all valid directions to attack.
+        :param hitsIndex: Int, index location of hit to check.
+        :param targetMap: Map_ class.
+        :return: List, all valid directions to attack.
         """
         validDirections = []
         hitToCheck = self.hits[hitsIndex]
@@ -123,7 +160,7 @@ class AI(player):
     def __noneHit(self, targetMap):
         """
         Call attack on random location.
-        :param targetMap: map class.
+        :param targetMap: Map_ class.
         """
         hitLoc = random.randint(0, len(targetMap.array) - 1)
         if targetMap.array[hitLoc].attack() is True:
@@ -132,7 +169,7 @@ class AI(player):
     def __unknownDirection(self, targetMap):
         """
         Call attack to check cardinal directions surrounding initial hit.
-        :param targetMap: map class.
+        :param targetMap: Map_ class.
         """
         hitShift = random.choice(
             self.__chooseValidShifts(0, targetMap))
@@ -146,7 +183,7 @@ class AI(player):
     def __knownDirection(self, targetMap):
         """
         Call attack to check cardinal directions surrounding latest hit.
-        :param targetMap: map class.
+        :param targetMap: Map_ class.
         """
         hitShift = random.choice(
             self.__chooseValidShifts(len(self.hits) - 1, targetMap))
@@ -159,8 +196,7 @@ class AI(player):
     def attack(self, targetMap):
         """
         Call attack on an appropriate location using known information.
-        :param
-        targetMap: map class.
+        :param targetMap: Map_ class.
         """
         if len(self.hits) == 0:
             self.__noneHit(targetMap)
@@ -171,15 +207,22 @@ class AI(player):
 
 
 class human(player):
+    """Object for human player, derived from player base class."""
     def __init__(self, lengthOfMap):
+        """
+        Call the player object contructor and assign a name and place ship.
+        :param lengthOfMap: Int.
+        """
         super().__init__(lengthOfMap)
         self.__assignName()
         self.__placeShip()
 
     def __assignName(self):
+        """Ask for user's name."""
         self.name = input("What is your name? ")
 
     def __placeShip(self):
+        """Place ship using information taken in."""
         self.map.displayMap(False)
         shipLoc = int(input("Where is {}'s ship? ".format(self.name)))
         shipLength = int(input("What is the length? "))
@@ -191,6 +234,10 @@ class human(player):
         self.map.placeShip(shipLoc, shipLength, shipOffset)
 
     def attack(self, targetMap):
+        """
+        Take an input and attack using the given input.
+        :param targetMap: Map_ class.
+        """
         targetMap.displayMap(False)
         attackLoc = int(input("Where are you attacking {}? ".format(self.name)))
         if targetMap.array[attackLoc].attack() is True:
@@ -202,10 +249,10 @@ class human(player):
 
 def displayFinalScreen(endMessage, playerOne, playerTwo):
     """
-    print the two players maps and display an end message
-    :param endMessage: message ending the maps
-    :param playerOne: player class
-    :param playerTwo: player class
+    Print the two player's maps and display an end message.
+    :param endMessage: String, message ending the maps.
+    :param playerOne: Player class
+    :param playerTwo: Player class
     """
     cls()
     print("{}'s Map:".format(playerOne.name))
@@ -218,10 +265,13 @@ def displayFinalScreen(endMessage, playerOne, playerTwo):
     print(endMessage)
 
 
-def cls(): print("\n"*100)
+def cls():
+    """Print 100 new lines."""
+    print("\n"*100)
 
 
 def main():
+    """Call everything neccesary to start game"""
     random.seed(int(time.time()))
     length = int(input("What is the length of the maps? "))
     AIOrPlayer = input("What is the game configuration? (PP/PAI/AIAI)? ").upper()
