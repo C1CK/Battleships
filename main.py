@@ -82,8 +82,8 @@ class map_(object):
         return True if this map has sips.
         :return: Bool.
         """
-        for i in range(0, self.length**2):
-            if self.array[i].entity == "ship":
+        for index, item in  enumerate(self.array):
+            if item.entity == "ship":
                 return True
         return False
 
@@ -207,6 +207,30 @@ class AI(player):
             self.__knownDirection(targetMap)
 
 
+class easyAI(AI):
+    """Easy difficulty AI, designed to make obvious errors in judgement and play worse than a normal human."""
+    def attack(self, targetMap):
+        chanceToFail = random.randint(0,100)
+        if chanceToFail < 20:
+            self.__noneHit(targetMap)
+        elif len(self.hits) == 0:
+            self.__noneHit(targetMap)
+        elif not (True in self.testedDirections):
+            self.__unknownDirection(targetMap)
+        elif True in self.testedDirections:
+            self.__knownDirection(targetMap)
+
+
+class mediumAI(AI):
+    """Medium difficulty AI, designed to be same skill level as a normal human."""
+    pass
+
+
+class hardAI(AI):
+    """Hard difficulty AI, designed to use more advanced algorithms and play better than a normal human."""
+    pass
+
+
 class human(player):
     """Object for human player, derived from player base class."""
     def __init__(self, lengthOfMap):
@@ -271,6 +295,24 @@ def cls():
     print("\n"*100)
 
 
+def setupAI(length):
+    """
+    return an AI class of difficulty given.
+    :param length: Int.
+    :return: AI class.
+    """
+    diff = input("What is the difficulty (E/M/H/P)? ")
+    if diff == "E":
+        AIObject = easyAI(length)
+    elif diff == "M":
+        AIObject = mediumAI(length)
+    elif diff == "H":
+        AIObject = hardAI(length)
+    elif diff == "P":
+        AIObject = AI(length)
+    return AIObject
+
+
 def main():
     """Call everything necessary to start game"""
     random.seed(int(time.time()))
@@ -278,13 +320,16 @@ def main():
     AIOrPlayer = input("What is the game configuration? (PP/PAI/AIAI)? ").upper()
     if AIOrPlayer == "PP":
         playerOne = human(length)
+        cls()
         playerTwo = human(length)
+        cls()
     elif AIOrPlayer == "PAI":
         playerOne = human(length)
-        playerTwo = AI(length)
+        cls()
+        playerTwo = setupAI(length)
     elif AIOrPlayer == "AIAI":
-        playerOne = AI(length)
-        playerTwo = AI(length)
+        playerOne = setupAI(length)
+        playerTwo = setupAI(length)
     while True:
         playerOne.attack(playerTwo.map)
         cls()
