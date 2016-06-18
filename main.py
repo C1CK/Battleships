@@ -1,5 +1,6 @@
 import time
 import random
+import modules.robotNames
 
 
 class tile(object):
@@ -117,7 +118,7 @@ class AI(player):
 
     def __assignName(self):
         """Assign a name for the AI"""
-        self.name = "AI"
+        self.name = modules.robotNames.newName()
 
     def __placeShip(self):
         """place own ship with random parameters."""
@@ -271,7 +272,7 @@ def cls():
 
 
 def main():
-    """Call everything neccesary to start game"""
+    """Call everything necessary to start game"""
     random.seed(int(time.time()))
     length = int(input("What is the length of the maps? "))
     AIOrPlayer = input("What is the game configuration? (PP/PAI/AIAI)? ").upper()
