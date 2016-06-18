@@ -134,6 +134,18 @@ class AI(player):
             shipOffset = -self.map.length
         self.map.placeShip(shipLoc, shipLength, shipOffset)
 
+    def __chooseUntargetedLocations(self, targetMap):
+        """
+        return all un targeted locations.
+        :param targetMap: Map_ class
+        :return: List, all un targeted directions
+        """
+        untargetedLocations = []
+        for index, item in targetMap.array:
+            if item.entity != "targeted":
+                untargetedLocations.append()
+        return untargetedLocations
+
     def __chooseValidShifts(self, hitsIndex, targetMap):
         """
         return a list of valid shift, which haven't been checked and don't run off the end of the map
@@ -148,13 +160,13 @@ class AI(player):
                     self.testedDirections[-1] is None):  # if y didn't change
             validDirections.append(-1)
         if (int(hitToCheck / length) == int((hitToCheck + 1) / length)) and (
-                    self.testedDirections[-1] is None):  # if y didn't change
+                    self.testedDirections[+1] is None):  # if y didn't change
             validDirections.append(1)
         if (hitToCheck % length == (hitToCheck - 10) % length) and (
-                    self.testedDirections[-1] is None):  # if x didn't change
+                    self.testedDirections[-10] is None):  # if x didn't change
             validDirections.append(-10)
         if (hitToCheck % length == (hitToCheck + 10) % length) and (
-                    self.testedDirections[-1] is None):  # if x didn't change
+                    self.testedDirections[+10] is None):  # if x didn't change
             validDirections.append(10)
         return validDirections
 
@@ -163,7 +175,7 @@ class AI(player):
         Call attack on random location.
         :param targetMap: Map_ class.
         """
-        hitLoc = random.randint(0, len(targetMap.array) - 1)
+        hitLoc = random.choice(self.__chooseUntargetedLocations(targetMap))
         if targetMap.array[hitLoc].attack() is True:
             self.hits.append(hitLoc)
 
@@ -172,8 +184,7 @@ class AI(player):
         Call attack to check cardinal directions surrounding initial hit.
         :param targetMap: Map_ class.
         """
-        hitShift = random.choice(
-            self.__chooseValidShifts(0, targetMap))
+        hitShift = random.choice(self.__chooseValidShifts(0, targetMap))
         hitLoc = self.hits[0] + hitShift
         if targetMap.array[hitLoc].attack() is True:
             self.hits.append(hitLoc)
@@ -186,8 +197,7 @@ class AI(player):
         Call attack to check cardinal directions surrounding latest hit.
         :param targetMap: Map_ class.
         """
-        hitShift = random.choice(
-            self.__chooseValidShifts(len(self.hits) - 1, targetMap))
+        hitShift = random.choice(self.__chooseValidShifts(len(self.hits) - 1, targetMap))
         hitLoc = self.hits[len(self.hits) - 1] + hitShift
         if targetMap.array[hitLoc].attack() is True:
             self.hits.append(hitLoc)
