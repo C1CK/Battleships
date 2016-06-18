@@ -210,6 +210,10 @@ class AI(player):
 class easyAI(AI):
     """Easy difficulty AI, designed to make obvious errors in judgement and play worse than a normal human."""
     def attack(self, targetMap):
+        """
+        Call attack on appropriate location, has 20% chance to hit a random target.
+        :param targetMap: Map_ class
+        """
         chanceToFail = random.randint(0,100)
         if chanceToFail < 20:
             self.__noneHit(targetMap)
