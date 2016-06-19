@@ -141,9 +141,10 @@ class AI(player):
         :return: List, all un targeted directions
         """
         untargetedLocations = []
-        for index, item in targetMap.array:
+        print(targetMap.array)
+        for index, item in enumerate(targetMap.array):
             if item.entity != "targeted":
-                untargetedLocations.append()
+                untargetedLocations.append(index)
         return untargetedLocations
 
     def __chooseValidShifts(self, hitsIndex, targetMap):
