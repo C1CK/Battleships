@@ -5,9 +5,11 @@ import modules.robotNames
 
 class tile(object):
     """Object for all tiles."""
-    def __init__(self):
+    def __init__(self, _map, location):
         """Create blank entity."""
         self.entity = ""
+        self.map = _map
+        self.location = location
 
     def getImage(self):
         """
@@ -37,6 +39,90 @@ class tile(object):
             self.entity = "targeted"
             return False
 
+    def hasAdjacentShip(self):
+        """
+        Return True if any ships adjacent to location
+        :return: Bool.
+        """
+        cardinals = [-1, -self.map.length, +1, +self.map.length]
+        for index, item in enumerate(cardinals):
+            if self.location+item < self.map.length**2 - 1:
+                if self.map.array[self.location+item].entity == "ship":
+                    return True
+
+    def availableSpace(self, orientation, offset):
+        """
+        Return available space for a ship
+        :param orientation: Char.
+        :param offset: Int.
+        :return:
+        """
+        count = 0
+        if orientation == "H":
+            while int(self.location / self.map.length) == int((self.location + count) / self.map.length):
+                count += 1
+        else:
+            while self.location + count * offset >= 0:
+                count += 1
+        return count
+
+
+class ship(object):
+    """Object for ships, used only for ship creation, discarded afterwards."""
+    def __init__(self, homeMap):
+        """
+        Assign homemap, length, location and orientation.
+        :param homeMap: _Map class
+        """
+        self.homeMap = homeMap
+        self.length = None
+        self.location = None
+        self.orientation = None
+        self.offset = None
+
+    def __chooseLocation(self):
+        """Choose a location based on length and orientation"""
+        while True:
+            self.location = random.choice(self.homeMap.array)
+            if self.validShipLocation()[0] is True:
+                break
+
+    def __chooseOrientation(self):
+        """Choose an orientation randomly"""
+        self.offset = random.choice([+1, -self.homeMap.length])
+        if self.offset == +1:
+            self.orientation = "H"
+        else:
+            self.orientation = "V"
+
+    def __chooseLength(self, maxLength):
+        """
+        Choose a length for the ship randomly
+        :param maxLength: Int, maximum length of ship
+        """
+        valid = False
+        while valid is False:
+            self.length = random.randint(1, maxLength)
+            if self.length <= self.homeMap.length:
+                valid = True
+
+    def validShipLocation(self):
+        if self.location.hasAdjacentShip():
+            return False, "Ship adjacent to chosen location"
+        if self.location.availableSpace(self.orientation, self.offset) < self.length:
+            return False, "Inadequate space to place ship"
+        return True, "This shouldn't EVER print"
+
+    def place(self, maxLength=0):
+        """Calculate any missing values and then place itself onto map"""
+        if self.orientation is None:
+            self.__chooseOrientation()
+        if self.length is None:
+            self.__chooseLength(maxLength)
+        if self.location is None:
+            self.__chooseLocation()
+        self.homeMap.placeShip(self.location.location, self.length, self.offset)
+
 
 class map_(object):
     """Object for each player's map."""
@@ -48,7 +134,7 @@ class map_(object):
         self.array = []
         self.length = length
         for x in range(0, length**2):
-            self.array.append(tile())
+            self.array.append(tile(self, x))
 
     def placeShip(self, startingPos, length, offset):
         """
@@ -82,7 +168,7 @@ class map_(object):
         return True if this map has sips.
         :return: Bool.
         """
-        for index, item in  enumerate(self.array):
+        for index, item in enumerate(self.array):
             if item.entity == "ship":
                 return True
         return False
@@ -120,7 +206,7 @@ class AI(player):
         """Assign a name for the AI"""
         self.name = modules.robotNames.newName()
 
-    def __placeShip(self):
+    def __legacyplaceShip(self):
         """place own ship with random parameters."""
         shipLoc = random.randint(0, self.map.length ** 2)
         shipOrientation = random.choice(["H", "V"])
@@ -133,6 +219,14 @@ class AI(player):
             shipLength = random.randint(1, maxLength)
             shipOffset = -self.map.length
         self.map.placeShip(shipLoc, shipLength, shipOffset)
+
+    def __placeShip(self):
+        """place own ships with a total length equal to totalLength"""
+        while self.shipsLeft > 0:
+            tempShip = ship(self.map)
+            tempShip.place(self.shipsLeft)
+            self.shipsLeft -= tempShip.length
+            del tempShip
 
     def __chooseUntargetedLocations(self, targetMap):
         """
@@ -220,6 +314,14 @@ class AI(player):
 
 class easyAI(AI):
     """Easy difficulty AI, designed to make obvious errors in judgement and play worse than a normal human."""
+    def __init__(self, lengthOfMap):
+        """
+        Initialize easyAI with fewer ships than standard.
+        :param lengthOfMap: Int
+        """
+        self.shipsLeft = 8
+        super().__init__(lengthOfMap)
+
     def attack(self, targetMap):
         """
         Call attack on appropriate location, has 20% chance to hit a random target.
@@ -238,12 +340,24 @@ class easyAI(AI):
 
 class mediumAI(AI):
     """Medium difficulty AI, designed to be same skill level as a normal human."""
-    pass
+    def __init__(self, lengthOfMap):
+        """
+        Initialize mediumAI with standard number of ships.
+        :param lengthOfMap: Int
+        """
+        self.shipsLeft = 12
+        super().__init__(lengthOfMap)
 
 
 class hardAI(AI):
     """Hard difficulty AI, designed to use more advanced algorithms and play better than a normal human."""
-    pass
+    def __init__(self, lengthOfMap):
+        """
+        Initialize hardAI with more ships than standard.
+        :param lengthOfMap: Int
+        """
+        self.shipsLeft = 16
+        super().__init__(lengthOfMap)
 
 
 class human(player):
@@ -254,6 +368,7 @@ class human(player):
         :param lengthOfMap: Int.
         """
         super().__init__(lengthOfMap)
+        self.shipsLeft = 12
         self.__assignName()
         self.__placeShip()
 
@@ -264,14 +379,23 @@ class human(player):
     def __placeShip(self):
         """Place ship using information taken in."""
         self.map.displayMap(False)
-        shipLoc = int(input("Where is {}'s ship? ".format(self.name)))
-        shipLength = int(input("What is the length? "))
-        shipOrientation = input("What is the orientation (V,H)? ")
-        if shipOrientation == "V":
-            shipOffset = self.map.length
-        if shipOrientation == "H":
-            shipOffset = 1
-        self.map.placeShip(shipLoc, shipLength, shipOffset)
+        while self.shipsLeft > 0:
+            tempShip = ship(self.map)
+            print("Remaining ship tiles needed : {}".format(self.shipsLeft))
+            tempShip.location = self.map.array[int((input("Where is the ship? ")))]
+            tempShip.orientation = input("What is the orientation (V,H)? ")
+            if tempShip.orientation == "H":
+                tempShip.offset = +1
+            else:
+                tempShip.offset = -self.map.length
+            tempShip.length = int(input("What is the length? "))
+            valid, error = tempShip.validShipLocation()
+            if valid is False:
+                print(error)
+            else:
+                tempShip.place()
+                self.shipsLeft -= tempShip.length
+                del tempShip
 
     def attack(self, targetMap):
         """
