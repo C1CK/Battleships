@@ -6,7 +6,7 @@ import modules.robotNames
 class tile(object):
     """Object for all tiles."""
     def __init__(self, _map, location):
-        """Create blank entity."""
+        """Create blank entity and save location and map data"""
         self.entity = ""
         self.map = _map
         self.location = location
@@ -41,14 +41,15 @@ class tile(object):
 
     def hasAdjacentShip(self):
         """
-        Return True if any ships adjacent to location
+        Return True if any ships adjacent to location.
         :return: Bool.
         """
         cardinals = [-1, -self.map.length, +1, +self.map.length]
         for index, item in enumerate(cardinals):
-            if self.location+item < self.map.length**2 - 1:
-                if self.map.array[self.location+item].entity == "ship":
+            if (self.location + item < self.map.length**2 - 1) and (self.location + item >= 0):
+                if self.map.array[self.location + item].entity == "ship":
                     return True
+        return False
 
     def availableSpace(self, orientation, offset):
         """
@@ -65,6 +66,65 @@ class tile(object):
             while self.location + count * offset >= 0:
                 count += 1
         return count
+
+
+class knowledgeTile(tile):
+    """Object for holding AI knowledge regarding a tile"""
+    def __init__(self, _map, location):
+        """Initialize as a possible location for a ship and save location and map data"""
+        self.entity = "possible"
+        self.map = _map
+        self.location = location
+
+    def getImage(self):
+        """
+        Return image to display in terminal (debugging).
+        :return: Char.
+        """
+        if self.entity == "possible":
+            return "□"
+        if self.entity == "hit":
+            return "⊛"
+        if self.entity == "completedShip":
+            return "⊛"
+        if self.entity == "impossible":
+            return "■"
+
+    def hasAdjacentShip(self):
+        """
+        Return True if any completeShips adjacent to location.
+        :return: Bool.
+        """
+        cardinals = [-1, -self.map.length, +1, +self.map.length]
+        for index, item in enumerate(cardinals):
+            if (self.location + item < self.map.length**2 - 1) and (self.location + item >= 0):
+                if self.map.array[self.location + item].entity == "completedShip":
+                    return True
+        return False
+
+    def hasVerticalShip(self):
+        """
+        Return True if any hits north or south of location.
+        :return: Bool.
+        """
+        verticals = [-self.map.length, +self.map.length]
+        for index, item in enumerate(verticals):
+            if (self.location + item < self.map.length**2 - 1) and (self.location + item >= 0):
+                if self.map.array[self.location + item].entity == "hit":
+                    return True
+        return False
+
+    def hasHorizontalShip(self):
+        """
+        Return True if any hits east or west of location.
+        :return: Bool.
+        """
+        horizontals = [-1, +1]
+        for index, item in enumerate(horizontals):
+            if (self.location + item < self.map.length**2 - 1) and (self.location + item >= 0):
+                if self.map.array[self.location + item].entity == "hit":
+                    return True
+        return False
 
 
 class ship(object):
@@ -102,15 +162,16 @@ class ship(object):
         """
         valid = False
         while valid is False:
-            self.length = random.randint(1, maxLength)
+            self.length = random.randint(2, maxLength)
             if self.length <= self.homeMap.length:
                 valid = True
 
     def validShipLocation(self):
-        if self.location.hasAdjacentShip():
-            return False, "Ship adjacent to chosen location"
         if self.location.availableSpace(self.orientation, self.offset) < self.length:
             return False, "Inadequate space to place ship"
+        for i in range(0, self.length):
+            if self.homeMap.array[self.location.location + self.offset * i].hasAdjacentShip():
+                return False, "Ship adjacent to chosen location"
         return True, "This shouldn't EVER print"
 
     def place(self, maxLength=0):
@@ -174,6 +235,120 @@ class map_(object):
         return False
 
 
+class knowledgeMap(map_):
+    """Object used for tracking AI knowledge"""
+    def __init__(self, length):
+        """
+        Create array and save length.
+        :param length:
+        """
+        self.array = []
+        self.length = length
+        for x in range(0, length**2):
+            self.array.append(knowledgeTile(self, x))
+
+    def sunkShip(self):
+        """Update knowledge to reflect ship being sunk."""
+        for index, item in enumerate(self.array):
+            if item.entity == "hit":
+                item.entity = "completedShip"
+            if item.hasAdjacentShip() is True:
+                item.entity = "impossible"
+
+    def shipLocated(self, location):
+        """
+        Mark four cardinals as "cardinalCheck".
+        :param location: Index.
+        """
+        cardinals = [-1, -self.length, +1, +self.length]
+        for index, item in enumerate(cardinals):
+            if location + item < self.length**2 - 1:
+                self.array[location + item].entity = "cardinalCheck"
+
+    def horizontalShip(self):
+        """Remove "cardinalCheck" markers and place "shipCheck" markers for horizontal locations."""
+        for index, item in enumerate(self.array):
+            if item.hasVerticalShip() is True:
+                item.entity = "impossible"
+            elif item.hasHorizontalShip() is True:
+                item.entity = "shipCheck"
+
+    def verticalShip(self):
+        """Remove "cardinalCheck" markers and place "shipCheck" markers for vertical locations."""
+        for index, item in enumerate(self.array):
+            if item.hasHorizontalShip() is True:
+                item.entity = "impossible"
+            elif item.hasVerticalShip() is True:
+                item.entity = "shipCheck"
+
+    def cardinalConfirmed(self, location):
+        """
+        Call appropriate ship direction function.
+        :param location: Index.
+        """
+        if self.array[location].hasHorizontalShip() is True:
+            self.horizontalShip()
+        else:
+            self.verticalShip()
+
+    def horizontalChecked(self):
+        """Replace vertical "cardinalCheck" with "probable" markers."""
+        for index, item in enumerate(self.array):
+            if item.hasVerticalShip() is True:
+                item.entity = "likelyCardinal"
+
+    def verticalChecked(self):
+        """Replace horinzontal "cardinalCheck" with "probable" markers."""
+        for index, item in enumerate(self.array):
+            if item.hasHorizontalShip() is True:
+                item.entity = "likelyCardinal"
+
+    def cardinalChecked(self, location):
+        """
+        Call appropriate ship direction checked function.
+        :param location: Index.
+        """
+        if self.array[location].hasHorizontalShip() is True:
+            self.horizontalChecked()
+        else:
+            self.verticalChecked()
+
+    def resetCardinalPriorities(self):
+        """Reset all "likelyCardinal"s to "cardinalCheck"."""
+        for index, item in enumerate(self.array):
+            if item.entity == "likelyCardinal":
+                item.entity = "cardinalCheck"
+
+    def shipCheckHit(self, location):
+        """
+        Mark next cardinal as shipCheck
+        :param location: Index.
+        """
+        horizontals = [-1, +1]
+        verticals = [-self.length, +self.length]
+        if self.array[location].hasHorizontalShip() is True:
+            directionToCheck = horizontals
+        else:
+            directionToCheck = verticals
+        for index, item in enumerate(directionToCheck):
+            if (location + item < self.length ** 2 - 1) and (location + item >= 0):
+                if self.array[location + item].entity == "possible":
+                    self.array[location + item].entity = "shipCheck"
+
+    def highestPriority(self):
+        """
+        Return highest priority attack.
+        :return: String.
+        """
+        if any(item.entity == "likelyCardinal" for index, item in enumerate(self.array)):
+            return "likelyCardinal"
+        if any(item.entity == "cardinalCheck" for index, item in enumerate(self.array)):
+            return "cardinalCheck"
+        if any(item.entity == "shipCheck" for index, item in enumerate(self.array)):
+            return "shipCheck"
+        return "possible"
+
+
 class player(object):
     """Base class for all players."""
     def __init__(self, lengthOfMap):
@@ -182,134 +357,79 @@ class player(object):
         :param lengthOfMap: Int.
         """
         self.map = map_(lengthOfMap)
+        self.targetMap = None
 
 
 class AI(player):
     """Object for AI player, derived from player base class."""
     def __init__(self, lengthOfMap):
         """
-        Assign name, place ship, create blank list for hits, and create array for tested directions.
+        Assign name, place ship, and create knowledgeMap to track knowns.
         :param lengthOfMap: Int.
         """
         super().__init__(lengthOfMap)
         self.__assignName()
         self.__placeShip()
-        self.hits = []
-        self.testedDirections = {
-            -1: None,
-            1: None,
-            -10: None,
-            10: None
-        }  # stores info on checked directions in the format left; right; up; down.
+        self.knowledge = knowledgeMap(lengthOfMap)
 
     def __assignName(self):
         """Assign a name for the AI"""
         self.name = modules.robotNames.newName()
 
-    def __legacyplaceShip(self):
-        """place own ship with random parameters."""
-        shipLoc = random.randint(0, self.map.length ** 2)
-        shipOrientation = random.choice(["H", "V"])
-        if shipOrientation == "H":
-            maxLength = self.map.length - (shipLoc % self.map.length)
-            shipLength = random.randint(1, maxLength)
-            shipOffset = 1
-        else:
-            maxLength = int(shipLoc / self.map.length)
-            shipLength = random.randint(1, maxLength)
-            shipOffset = -self.map.length
-        self.map.placeShip(shipLoc, shipLength, shipOffset)
-
     def __placeShip(self):
         """place own ships with a total length equal to totalLength"""
-        while self.shipsLeft > 0:
+        while self.shipsLeft > 1:
             tempShip = ship(self.map)
             tempShip.place(self.shipsLeft)
             self.shipsLeft -= tempShip.length
             del tempShip
 
-    def __chooseUntargetedLocations(self, targetMap):
+    def __callAttack(self, location):
         """
-        return all un targeted locations.
-        :param targetMap: Map_ class
-        :return: List, all un targeted directions
+        call attack and update the knowledgeMap.
+        :param location: index.
         """
-        untargetedLocations = []
-        print(targetMap.array)
-        for index, item in enumerate(targetMap.array):
-            if item.entity != "targeted":
-                untargetedLocations.append(index)
-        return untargetedLocations
-
-    def __chooseValidShifts(self, hitsIndex, targetMap):
-        """
-        return a list of valid shift, which haven't been checked and don't run off the end of the map
-        :param hitsIndex: Int, index location of hit to check.
-        :param targetMap: Map_ class.
-        :return: List, all valid directions to attack.
-        """
-        validDirections = []
-        hitToCheck = self.hits[hitsIndex]
-        length = targetMap.length
-        if (int(hitToCheck / length) == int((hitToCheck - 1) / length)) and (
-                    self.testedDirections[-1] is None):  # if y didn't change
-            validDirections.append(-1)
-        if (int(hitToCheck / length) == int((hitToCheck + 1) / length)) and (
-                    self.testedDirections[+1] is None):  # if y didn't change
-            validDirections.append(1)
-        if (hitToCheck % length == (hitToCheck - 10) % length) and (
-                    self.testedDirections[-10] is None):  # if x didn't change
-            validDirections.append(-10)
-        if (hitToCheck % length == (hitToCheck + 10) % length) and (
-                    self.testedDirections[+10] is None):  # if x didn't change
-            validDirections.append(10)
-        return validDirections
-
-    def __noneHit(self, targetMap):
-        """
-        Call attack on random location.
-        :param targetMap: Map_ class.
-        """
-        hitLoc = random.choice(self.__chooseUntargetedLocations(targetMap))
-        if targetMap.array[hitLoc].attack() is True:
-            self.hits.append(hitLoc)
-
-    def __unknownDirection(self, targetMap):
-        """
-        Call attack to check cardinal directions surrounding initial hit.
-        :param targetMap: Map_ class.
-        """
-        hitShift = random.choice(self.__chooseValidShifts(0, targetMap))
-        hitLoc = self.hits[0] + hitShift
-        if targetMap.array[hitLoc].attack() is True:
-            self.hits.append(hitLoc)
-            self.testedDirections[hitShift] = True  # indicate direction for future testing
+        if self.targetMap.array[location].attack() is True:
+            self.knowledge.array[location].entity = "hit"
+            return True
         else:
-            self.testedDirections[hitShift] = False  # indicate direction as checked
+            self.knowledge.array[location].entity = "impossible"
+            return False
 
-    def __knownDirection(self, targetMap):
+    def __updateKnowledge(self, location, attackInfo):
         """
-        Call attack to check cardinal directions surrounding latest hit.
-        :param targetMap: Map_ class.
+        Update knowledgeMap appropriately.
+        :param location: Index.
+        :param attackInfo: String.
         """
-        hitShift = random.choice(self.__chooseValidShifts(len(self.hits) - 1, targetMap))
-        hitLoc = self.hits[len(self.hits) - 1] + hitShift
-        if targetMap.array[hitLoc].attack() is True:
-            self.hits.append(hitLoc)
-        else:
-            self.testedDirections[hitShift] = False  # indicate that this direction is now invalid
+        if (attackInfo == "shipCheck") and (self.knowledge.array[location].entity == "hit"):
+            self.knowledge.shipCheckHit(location)
+            if any(item.entity == "shipCheck" for index, item in enumerate(self.knowledge.array)):
+                self.knowledge.sunkShip()
+        if (attackInfo == "possible") and (self.knowledge.array[location].entity == "hit"):
+            self.knowledge.shipLocated(location)
+        if (attackInfo == "cardinalCheck") and (self.knowledge.array[location].entity == "hit"):
+            self.knowledge.cardinalConfirmed(location)
+        elif (attackInfo == "cardinalCheck") and (self.knowledge.array[location].entity != "hit"):
+            self.knowledge.resetCardinalPriorities()
+            self.knowledge.cardinalChecked(location)
+        if (attackInfo == "likelyCardinal") and (self.knowledge.array[location].entity == "hit"):
+            self.knowledge.cardinalConfirmed(location)
+        elif (attackInfo == "likelyCardinal") and (self.knowledge.array[location].entity != "hit"):
+            self.knowledge.resetCardinalPriorities()
+            self.knowledge.cardinalChecked(location)
 
-    def attack(self, targetMap):
-        """
-        Call attack on an appropriate location using known information.
-        :param targetMap: Map_ class.
-        """
-        if len(self.hits) == 0:
-            self.__noneHit(targetMap)
-        elif not (True in self.testedDirections):
-            self.__unknownDirection(targetMap)
-        elif True in self.testedDirections:
-            self.__knownDirection(targetMap)
+    def attack(self):
+        """Call attack on appropriate location"""
+        highestPriority = self.knowledge.highestPriority()
+        locationsToRandomise = []
+        for index, item in enumerate(self.knowledge.array):
+            if item.entity == highestPriority:
+                locationsToRandomise.append(index)
+        locationToAttack = random.choice(locationsToRandomise)
+        hit = self.__callAttack(locationToAttack)
+        self.__updateKnowledge(locationToAttack, highestPriority)
+        return hit
 
 
 class easyAI(AI):
@@ -321,21 +441,6 @@ class easyAI(AI):
         """
         self.shipsLeft = 8
         super().__init__(lengthOfMap)
-
-    def attack(self, targetMap):
-        """
-        Call attack on appropriate location, has 20% chance to hit a random target.
-        :param targetMap: Map_ class
-        """
-        chanceToFail = random.randint(0,100)
-        if chanceToFail < 20:
-            self.__noneHit(targetMap)
-        elif len(self.hits) == 0:
-            self.__noneHit(targetMap)
-        elif not (True in self.testedDirections):
-            self.__unknownDirection(targetMap)
-        elif True in self.testedDirections:
-            self.__knownDirection(targetMap)
 
 
 class mediumAI(AI):
@@ -364,7 +469,7 @@ class human(player):
     """Object for human player, derived from player base class."""
     def __init__(self, lengthOfMap):
         """
-        Call the player object contructor and assign a name and place ship.
+        Call the player object constructor and assign a name and place ship.
         :param lengthOfMap: Int.
         """
         super().__init__(lengthOfMap)
@@ -397,18 +502,21 @@ class human(player):
                 self.shipsLeft -= tempShip.length
                 del tempShip
 
-    def attack(self, targetMap):
+    def attack(self):
         """
-        Take an input and attack using the given input.
-        :param targetMap: Map_ class.
+        Take an input and attack using the given input, returns True is hit.
+        :return: Bool
         """
-        targetMap.displayMap(False)
+        self.targetMap.displayMap(False)
         attackLoc = int(input("Where are you attacking {}? ".format(self.name)))
-        if targetMap.array[attackLoc].attack() is True:
+        if self.targetMap.array[attackLoc].attack() is True:
             print("Hit!")
+            time.sleep(1)
+            return True
         else:
             print("Miss")
-        time.sleep(1)
+            time.sleep(1)
+            return False
 
 
 def displayFinalScreen(endMessage, playerOne, playerTwo):
@@ -466,17 +574,25 @@ def main():
         playerOne = human(length)
         cls()
         playerTwo = setupAI(length)
-    elif AIOrPlayer == "AIAI":
+    else:
         playerOne = setupAI(length)
         playerTwo = setupAI(length)
+    playerOne.targetMap = playerTwo.map
+    playerTwo.targetMap = playerOne.map
     while True:
-        playerOne.attack(playerTwo.map)
-        cls()
+        while True:
+            cls()
+            if playerOne.attack() is False:
+                break
+        playerTwo.map.displayMap(True)
         if playerTwo.map.hasShips() is False:
             displayFinalScreen("{} has won!".format(playerOne.name), playerOne, playerTwo)
             break
-        playerTwo.attack(playerOne.map)
-        cls()
+        while True:
+            cls()
+            if playerTwo.attack() is False:
+                break
+        playerOne.map.displayMap(True)
         if playerOne.map.hasShips() is False:
             displayFinalScreen("{} has won!".format(playerTwo.name), playerOne, playerTwo)
             break
