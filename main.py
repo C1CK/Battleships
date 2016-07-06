@@ -1,10 +1,14 @@
 import time
 import random
-import modules.robotNames
+from sys import modules
+from copy import deepcopy
+
+import externals.robotNames
 
 
 class tile(object):
     """Object for all tiles."""
+
     def __init__(self, _map, location):
         """Create blank entity and save location and map data"""
         self.entity = ""
@@ -46,7 +50,7 @@ class tile(object):
         """
         cardinals = [-1, -self.map.length, +1, +self.map.length]
         for index, item in enumerate(cardinals):
-            if (self.location + item < self.map.length**2 - 1) and (self.location + item >= 0):
+            if (self.location + item < self.map.length ** 2 - 1) and (self.location + item >= 0):
                 if self.map.array[self.location + item].entity == "ship":
                     return True
         return False
@@ -70,6 +74,7 @@ class tile(object):
 
 class knowledgeTile(tile):
     """Object for holding AI knowledge regarding a tile"""
+
     def __init__(self, _map, location):
         """Initialize as a possible location for a ship and save location and map data"""
         self.entity = "possible"
@@ -97,7 +102,7 @@ class knowledgeTile(tile):
         """
         cardinals = [-1, -self.map.length, +1, +self.map.length]
         for index, item in enumerate(cardinals):
-            if (self.location + item < self.map.length**2 - 1) and (self.location + item >= 0):
+            if (self.location + item < self.map.length ** 2 - 1) and (self.location + item >= 0):
                 if self.map.array[self.location + item].entity == "completedShip":
                     return True
         return False
@@ -109,7 +114,7 @@ class knowledgeTile(tile):
         """
         verticals = [-self.map.length, +self.map.length]
         for index, item in enumerate(verticals):
-            if (self.location + item < self.map.length**2 - 1) and (self.location + item >= 0):
+            if (self.location + item < self.map.length ** 2 - 1) and (self.location + item >= 0):
                 if self.map.array[self.location + item].entity == "hit":
                     return True
         return False
@@ -121,7 +126,7 @@ class knowledgeTile(tile):
         """
         horizontals = [-1, +1]
         for index, item in enumerate(horizontals):
-            if (self.location + item < self.map.length**2 - 1) and (self.location + item >= 0):
+            if (self.location + item < self.map.length ** 2 - 1) and (self.location + item >= 0):
                 if self.map.array[self.location + item].entity == "hit":
                     return True
         return False
@@ -129,6 +134,7 @@ class knowledgeTile(tile):
 
 class ship(object):
     """Object for ships, used only for ship creation, discarded afterwards."""
+
     def __init__(self, homeMap):
         """
         Assign homemap, length, location and orientation.
@@ -187,6 +193,7 @@ class ship(object):
 
 class map_(object):
     """Object for each player's map."""
+
     def __init__(self, length):
         """
         Create array and save length.
@@ -194,7 +201,7 @@ class map_(object):
         """
         self.array = []
         self.length = length
-        for x in range(0, length**2):
+        for x in range(0, length ** 2):
             self.array.append(tile(self, x))
 
     def placeShip(self, startingPos, length, offset):
@@ -237,6 +244,7 @@ class map_(object):
 
 class knowledgeMap(map_):
     """Object used for tracking AI knowledge"""
+
     def __init__(self, length):
         """
         Create array and save length.
@@ -244,7 +252,7 @@ class knowledgeMap(map_):
         """
         self.array = []
         self.length = length
-        for x in range(0, length**2):
+        for x in range(0, length ** 2):
             self.array.append(knowledgeTile(self, x))
 
     def sunkShip(self):
@@ -262,7 +270,7 @@ class knowledgeMap(map_):
         """
         cardinals = [-1, -self.length, +1, +self.length]
         for index, item in enumerate(cardinals):
-            if location + item < self.length**2 - 1:
+            if location + item < self.length ** 2 - 1:
                 self.array[location + item].entity = "cardinalCheck"
 
     def horizontalShip(self):
@@ -351,6 +359,7 @@ class knowledgeMap(map_):
 
 class player(object):
     """Base class for all players."""
+
     def __init__(self, lengthOfMap):
         """
         Create map class for all child classes.
@@ -362,6 +371,7 @@ class player(object):
 
 class AI(player):
     """Object for AI player, derived from player base class."""
+
     def __init__(self, lengthOfMap):
         """
         Assign name, place ship, and create knowledgeMap to track knowns.
@@ -374,7 +384,7 @@ class AI(player):
 
     def __assignName(self):
         """Assign a name for the AI"""
-        self.name = modules.robotNames.newName()
+        self.name = externals.robotNames.newName()
 
     def __placeShip(self):
         """place own ships with a total length equal to totalLength"""
@@ -404,8 +414,9 @@ class AI(player):
         """
         if (attackInfo == "shipCheck") and (self.knowledge.array[location].entity == "hit"):
             self.knowledge.shipCheckHit(location)
-            if any(item.entity == "shipCheck" for index, item in enumerate(self.knowledge.array)):
-                self.knowledge.sunkShip()
+        if (attackInfo == "shipCheck") and (
+                not any(item.entity == "shipCheck" for index, item in enumerate(self.knowledge.array))):
+            self.knowledge.sunkShip()
         if (attackInfo == "possible") and (self.knowledge.array[location].entity == "hit"):
             self.knowledge.shipLocated(location)
         if (attackInfo == "cardinalCheck") and (self.knowledge.array[location].entity == "hit"):
@@ -434,6 +445,7 @@ class AI(player):
 
 class easyAI(AI):
     """Easy difficulty AI, designed to make obvious errors in judgement and play worse than a normal human."""
+
     def __init__(self, lengthOfMap):
         """
         Initialize easyAI with fewer ships than standard.
@@ -445,6 +457,7 @@ class easyAI(AI):
 
 class mediumAI(AI):
     """Medium difficulty AI, designed to be same skill level as a normal human."""
+
     def __init__(self, lengthOfMap):
         """
         Initialize mediumAI with standard number of ships.
@@ -456,6 +469,7 @@ class mediumAI(AI):
 
 class hardAI(AI):
     """Hard difficulty AI, designed to use more advanced algorithms and play better than a normal human."""
+
     def __init__(self, lengthOfMap):
         """
         Initialize hardAI with more ships than standard.
@@ -467,6 +481,7 @@ class hardAI(AI):
 
 class human(player):
     """Object for human player, derived from player base class."""
+
     def __init__(self, lengthOfMap):
         """
         Call the player object constructor and assign a name and place ship.
@@ -487,13 +502,13 @@ class human(player):
         while self.shipsLeft > 0:
             tempShip = ship(self.map)
             print("Remaining ship tiles needed : {}".format(self.shipsLeft))
-            tempShip.location = self.map.array[int((input("Where is the ship? ")))]
-            tempShip.orientation = input("What is the orientation (V,H)? ")
+            tempShip.location = self.map.array[inputInt("Where is the ship? ")]
+            tempShip.orientation = inputStr("What is the orientation (V,H)? ", ["V", "H"])
             if tempShip.orientation == "H":
                 tempShip.offset = +1
             else:
                 tempShip.offset = -self.map.length
-            tempShip.length = int(input("What is the length? "))
+            tempShip.length = inputInt("What is the length? ")
             valid, error = tempShip.validShipLocation()
             if valid is False:
                 print(error)
@@ -508,94 +523,169 @@ class human(player):
         :return: Bool
         """
         self.targetMap.displayMap(False)
-        attackLoc = int(input("Where are you attacking {}? ".format(self.name)))
-        if self.targetMap.array[attackLoc].attack() is True:
-            print("Hit!")
-            time.sleep(1)
-            return True
-        else:
-            print("Miss")
-            time.sleep(1)
-            return False
+        while True:
+            attackLoc = inputInt("Where are you attacking {}? ".format(self.name))
+            try:
+                if self.targetMap.array[attackLoc].attack() is True:
+                    print("Hit!")
+                    time.sleep(1)
+                    return True
+                else:
+                    print("Miss")
+                    time.sleep(1)
+                    return False
+            except IndexError:
+                print("Value entered not on map")
 
 
-def displayFinalScreen(endMessage, playerOne, playerTwo):
-    """
-    Print the two player's maps and display an end message.
-    :param endMessage: String, message ending the maps.
-    :param playerOne: Player class
-    :param playerTwo: Player class
-    """
-    cls()
-    print("{}'s Map:".format(playerOne.name))
-    print("\n", end="")
-    playerOne.map.displayMap(True)
-    print("\n\n", end="")
-    print("{}'s Map:".format(playerTwo.name))
-    print("\n", end="")
-    playerTwo.map.displayMap(True)
-    print(endMessage)
+class game(object):
+    """Game class for usage in main."""
+
+    def __init__(self, mapSize, gameConfig):
+        """Initialize mapSize, gameConfig, and players"""
+        self.mapSize = mapSize
+        self.playerOne = None
+        self.playerTwo = None
+        self.gameConfig = gameConfig
+
+    def displayFinalScreen(self, endMessage):
+        """
+        Print Final Game Screen.
+        :param endMessage: String.
+        """
+        print("{}'s Map:".format(self.playerOne.name))
+        print("\n", end="")
+        self.playerOne.map.displayMap(True)
+        print("\n\n", end="")
+        print("{}'s Map:".format(self.playerTwo.name))
+        print("\n", end="")
+        self.playerTwo.map.displayMap(True)
+        print("\n\n\n\n", end="")
+        print(endMessage)
+
+    def setupAI(self, difficulty):
+        """
+        Return an AI of difficulty given.
+        :param difficulty: Char.
+        """
+        if difficulty == "E":
+            AIObject = easyAI(self.mapSize)
+        elif difficulty == "M":
+            AIObject = mediumAI(self.mapSize)
+        elif difficulty == "H":
+            AIObject = hardAI(self.mapSize)
+        return AIObject
+
+    def setupGame(self):
+        if self.gameConfig == "PP":
+            self.playerOne = human(self.mapSize)
+            cls()
+            self.playerTwo = human(self.mapSize)
+            cls()
+        if self.gameConfig == "PAI":
+            self.playerOne = human(self.mapSize)
+            cls()
+            self.playerTwo = self.setupAI(inputStr("What is the difficulty (E/M/H)", ["E", "M", "H"]))
+        if self.gameConfig == "AIAI":
+            self.playerOne = self.setupAI(inputStr("What is the difficulty (E/M/H)", ["E", "M", "H"]))
+            self.playerTwo = self.setupAI(inputStr("What is the difficulty (E/M/H)", ["E", "M", "H"]))
+        self.playerOne.targetMap = self.playerTwo.map
+        self.playerTwo.targetMap = self.playerOne.map
+
+    def gameLoop(self):
+        """
+        Run through the game until someone wins, return their object.
+        :return: Player.
+        """
+        while True:
+            while True:
+                cls()
+                if self.playerOne.attack() is False:
+                    break
+            self.playerTwo.map.displayMap(True)
+            if self.playerTwo.map.hasShips() is False:
+                self.displayFinalScreen("{} has won!".format(self.playerOne.name))
+                return self.playerOne
+            while True:
+                cls()
+                if self.playerTwo.attack() is False:
+                    break
+            self.playerOne.map.displayMap(True)
+            if self.playerOne.map.hasShips() is False:
+                self.displayFinalScreen("{} has won!".format(self.playerTwo.name))
+                return self.playerTwo
 
 
 def cls():
     """Print 100 new lines."""
-    print("\n"*100)
+    print("\n" * 100)
 
 
-def setupAI(length):
+def inputInt(message):
     """
-    return an AI class of difficulty given.
-    :param length: Int.
-    :return: AI class.
+    Take an integer and return it, handling errors.
+    :param message: String.
+    :return: Int.
     """
-    diff = input("What is the difficulty (E/M/H/P)? ")
-    if diff == "E":
-        AIObject = easyAI(length)
-    elif diff == "M":
-        AIObject = mediumAI(length)
-    elif diff == "H":
-        AIObject = hardAI(length)
-    elif diff == "P":
-        AIObject = AI(length)
-    return AIObject
+    while True:
+        try:
+            value = int(input(message))
+        except ValueError:
+            print("Input is not an integer!")
+        else:
+            return value
+
+
+def inputStr(message, validEntries):
+    """
+    Take a string input and return it.
+    :param message: String.
+    :param validEntries: List.
+    :return: String.
+    """
+    while True:
+        value = input(message).upper()
+        if value in validEntries:
+            return value
+        else:
+            print("Entry not valid!")
 
 
 def main():
     """Call everything necessary to start game"""
     random.seed(int(time.time()))
-    length = int(input("What is the length of the maps? "))
-    AIOrPlayer = input("What is the game configuration? (PP/PAI/AIAI)? ").upper()
-    if AIOrPlayer == "PP":
-        playerOne = human(length)
-        cls()
-        playerTwo = human(length)
-        cls()
-    elif AIOrPlayer == "PAI":
-        playerOne = human(length)
-        cls()
-        playerTwo = setupAI(length)
+    mapSize = inputInt("What is the length of the maps? ")
+    gameConfig = inputStr("What is the game configuration? (PP/PAI/AIAI)? ", ["PP", "PAI", "AIAI"])
+    if gameConfig != "AIAI":
+        mainGame = game(mapSize, gameConfig)
+        mainGame.setupGame()
+        mainGame.gameLoop()
+        del mainGame
+        return 0
     else:
-        playerOne = setupAI(length)
-        playerTwo = setupAI(length)
-    playerOne.targetMap = playerTwo.map
-    playerTwo.targetMap = playerOne.map
-    while True:
+        winners = []
+        cycles = inputInt("What is the number of cycles? ")
         while True:
-            cls()
-            if playerOne.attack() is False:
+            try:
+                difficulty1Class = getattr(modules[__name__], input("What is the first AI's Class? "))(mapSize)
+                difficulty2Class = getattr(modules[__name__], input("What is the second AI's Class? "))(mapSize)
+                assert isinstance(difficulty1Class, AI)
+                assert isinstance(difficulty2Class, AI)
+            except AttributeError:
+                print("Input is not a class")
+            except (AssertionError, TypeError):
+                print("Input is not derived from AI")
+            else:
                 break
-        playerTwo.map.displayMap(True)
-        if playerTwo.map.hasShips() is False:
-            displayFinalScreen("{} has won!".format(playerOne.name), playerOne, playerTwo)
-            break
-        while True:
-            cls()
-            if playerTwo.attack() is False:
-                break
-        playerOne.map.displayMap(True)
-        if playerOne.map.hasShips() is False:
-            displayFinalScreen("{} has won!".format(playerTwo.name), playerOne, playerTwo)
-            break
+        for i in range(0, cycles):
+            cyclesGame = game(mapSize, gameConfig)
+            cyclesGame.playerOne = cyclesGame.playerOne = deepcopy(difficulty1Class)
+            cyclesGame.playerTwo = cyclesGame.playerTwo = deepcopy(difficulty2Class)
+            cyclesGame.playerOne.targetMap = cyclesGame.playerTwo.map
+            cyclesGame.playerTwo.targetMap = cyclesGame.playerOne.map
+            winners.append(cyclesGame.gameLoop().__class__)
+        print("totals wins for {} : {}".format(difficulty1Class, winners.count(difficulty1Class.__class__)))
+        print("totals wins for {} : {}".format(difficulty2Class, winners.count(difficulty2Class.__class__)))
 
 
 main()
