@@ -1,9 +1,16 @@
 import time
 import random
 from sys import modules
-from copy import deepcopy
 
 import externals.robotNames
+
+
+class FunctionFailedError(Exception):
+    """Exception for an undefined error occurring in a function."""
+
+    def __init__(self, function):
+        self.function = function
+        Exception.__init__(self, "Unspecified Error Occurred In {}".format(function))
 
 
 class tile(object):
@@ -50,7 +57,7 @@ class tile(object):
         """
         cardinals = [-1, -self.map.length, +1, +self.map.length]
         for index, item in enumerate(cardinals):
-            if (self.location + item < self.map.length ** 2 - 1) and (self.location + item >= 0):
+            if self.validOffset(item):
                 if self.map.array[self.location + item].entity == "ship":
                     return True
         return False
@@ -67,9 +74,24 @@ class tile(object):
             while int(self.location / self.map.length) == int((self.location + count) / self.map.length):
                 count += 1
         else:
-            while self.location + count * offset >= 0:
+            while (self.location + count * offset >= 0) and (self.location + count * offset < self.map.length ** 2):
                 count += 1
         return count
+
+    def validOffset(self, offset):
+        """
+        Return True if the offset given is valid.
+        :param offset: Int.
+        :return: Bool.
+        """
+        if (self.location + offset < self.map.length ** 2) and (self.location + offset >= 0):
+            if abs(offset) == 1:
+                if int(self.location / self.map.length) == int((self.location + offset) / self.map.length):
+                    return True
+            if abs(offset) == self.map.length:
+                if (self.location + offset >= 0) and (self.location + offset < self.map.length ** 2):
+                    return True
+        return False
 
 
 class knowledgeTile(tile):
@@ -102,7 +124,7 @@ class knowledgeTile(tile):
         """
         cardinals = [-1, -self.map.length, +1, +self.map.length]
         for index, item in enumerate(cardinals):
-            if (self.location + item < self.map.length ** 2 - 1) and (self.location + item >= 0):
+            if self.validOffset(item):
                 if self.map.array[self.location + item].entity == "completedShip":
                     return True
         return False
@@ -114,7 +136,7 @@ class knowledgeTile(tile):
         """
         verticals = [-self.map.length, +self.map.length]
         for index, item in enumerate(verticals):
-            if (self.location + item < self.map.length ** 2 - 1) and (self.location + item >= 0):
+            if self.validOffset(item):
                 if self.map.array[self.location + item].entity == "hit":
                     return True
         return False
@@ -126,7 +148,7 @@ class knowledgeTile(tile):
         """
         horizontals = [-1, +1]
         for index, item in enumerate(horizontals):
-            if (self.location + item < self.map.length ** 2 - 1) and (self.location + item >= 0):
+            if self.validOffset(item):
                 if self.map.array[self.location + item].entity == "hit":
                     return True
         return False
@@ -148,10 +170,14 @@ class ship(object):
 
     def __chooseLocation(self):
         """Choose a location based on length and orientation"""
+        fails = 0
         while True:
             self.location = random.choice(self.homeMap.array)
             if self.validShipLocation()[0] is True:
                 break
+            if fails > 10:
+                raise FunctionFailedError(__name__)
+            fails += 1
 
     def __chooseOrientation(self):
         """Choose an orientation randomly"""
@@ -182,13 +208,18 @@ class ship(object):
 
     def place(self, maxLength=0):
         """Calculate any missing values and then place itself onto map"""
-        if self.orientation is None:
-            self.__chooseOrientation()
-        if self.length is None:
-            self.__chooseLength(maxLength)
-        if self.location is None:
-            self.__chooseLocation()
-        self.homeMap.placeShip(self.location.location, self.length, self.offset)
+        while True:
+            try:
+                if self.orientation is None:
+                    self.__chooseOrientation()
+                if self.length is None:
+                    self.__chooseLength(maxLength)
+                if self.location is None:
+                    self.__chooseLocation()
+                self.homeMap.placeShip(self.location.location, self.length, self.offset)
+                break
+            except FunctionFailedError:
+                self.__init__(self.homeMap)
 
 
 class map_(object):
@@ -270,23 +301,27 @@ class knowledgeMap(map_):
         """
         cardinals = [-1, -self.length, +1, +self.length]
         for index, item in enumerate(cardinals):
-            if location + item < self.length ** 2 - 1:
+            if self.array[location].validOffset(item):
                 self.array[location + item].entity = "cardinalCheck"
 
     def horizontalShip(self):
         """Remove "cardinalCheck" markers and place "shipCheck" markers for horizontal locations."""
         for index, item in enumerate(self.array):
-            if item.hasVerticalShip() is True:
+            if item.entity == "cardinalCheck":
                 item.entity = "impossible"
-            elif item.hasHorizontalShip() is True:
+            if item.hasVerticalShip() and (item.entity != "hit"):
+                item.entity = "impossible"
+            if item.hasHorizontalShip() and (item.entity != "hit"):
                 item.entity = "shipCheck"
 
     def verticalShip(self):
         """Remove "cardinalCheck" markers and place "shipCheck" markers for vertical locations."""
         for index, item in enumerate(self.array):
-            if item.hasHorizontalShip() is True:
+            if item.entity == "cardinalCheck":
                 item.entity = "impossible"
-            elif item.hasVerticalShip() is True:
+            if item.hasHorizontalShip() and (item.entity != "hit"):
+                item.entity = "impossible"
+            elif item.hasVerticalShip() and (item.entity != "hit"):
                 item.entity = "shipCheck"
 
     def cardinalConfirmed(self, location):
@@ -300,13 +335,13 @@ class knowledgeMap(map_):
             self.verticalShip()
 
     def horizontalChecked(self):
-        """Replace vertical "cardinalCheck" with "probable" markers."""
+        """Replace vertical "cardinalCheck" with "likelyCardinal" markers."""
         for index, item in enumerate(self.array):
             if item.hasVerticalShip() is True:
                 item.entity = "likelyCardinal"
 
     def verticalChecked(self):
-        """Replace horinzontal "cardinalCheck" with "probable" markers."""
+        """Replace horizontal "cardinalCheck" with "likelyCardinal" markers."""
         for index, item in enumerate(self.array):
             if item.hasHorizontalShip() is True:
                 item.entity = "likelyCardinal"
@@ -329,18 +364,18 @@ class knowledgeMap(map_):
 
     def shipCheckHit(self, location):
         """
-        Mark next cardinal as shipCheck
+        Mark next cardinal as "shipCheck"
         :param location: Index.
         """
         horizontals = [-1, +1]
         verticals = [-self.length, +self.length]
-        if self.array[location].hasHorizontalShip() is True:
+        if self.array[location].hasHorizontalShip():
             directionToCheck = horizontals
-        else:
+        elif self.array[location].hasVerticalShip():
             directionToCheck = verticals
         for index, item in enumerate(directionToCheck):
-            if (location + item < self.length ** 2 - 1) and (location + item >= 0):
-                if self.array[location + item].entity == "possible":
+            if self.array[location].validOffset(item):
+                if self.array[location + item].entity != "hit":
                     self.array[location + item].entity = "shipCheck"
 
     def highestPriority(self):
@@ -388,6 +423,7 @@ class AI(player):
 
     def __placeShip(self):
         """place own ships with a total length equal to totalLength"""
+        fails = 0
         while self.shipsLeft > 1:
             tempShip = ship(self.map)
             tempShip.place(self.shipsLeft)
@@ -397,7 +433,7 @@ class AI(player):
     def __callAttack(self, location):
         """
         call attack and update the knowledgeMap.
-        :param location: index.
+        :param location: Index.
         """
         if self.targetMap.array[location].attack() is True:
             self.knowledge.array[location].entity = "hit"
@@ -414,21 +450,32 @@ class AI(player):
         """
         if (attackInfo == "shipCheck") and (self.knowledge.array[location].entity == "hit"):
             self.knowledge.shipCheckHit(location)
+            return "{} shipCheck hit {}".format(self.__class__, location)
         if (attackInfo == "shipCheck") and (
                 not any(item.entity == "shipCheck" for index, item in enumerate(self.knowledge.array))):
             self.knowledge.sunkShip()
-        if (attackInfo == "possible") and (self.knowledge.array[location].entity == "hit"):
+            return "{} Ship sunk {}".format(self.__class__, location)
+        elif (attackInfo == "possible") and (self.knowledge.array[location].entity == "hit"):
             self.knowledge.shipLocated(location)
-        if (attackInfo == "cardinalCheck") and (self.knowledge.array[location].entity == "hit"):
+            return "{} Ship Located {}".format(self.__class__, location)
+        elif (attackInfo == "cardinalCheck") and (self.knowledge.array[location].entity == "hit"):
+            self.knowledge.resetCardinalPriorities()
             self.knowledge.cardinalConfirmed(location)
+            return "{} cardinalCheck hit {}".format(self.__class__, location)
         elif (attackInfo == "cardinalCheck") and (self.knowledge.array[location].entity != "hit"):
             self.knowledge.resetCardinalPriorities()
             self.knowledge.cardinalChecked(location)
-        if (attackInfo == "likelyCardinal") and (self.knowledge.array[location].entity == "hit"):
+            return "{} cardinalCheck miss {}".format(self.__class__, location)
+        elif (attackInfo == "likelyCardinal") and (self.knowledge.array[location].entity == "hit"):
+            self.knowledge.resetCardinalPriorities()
             self.knowledge.cardinalConfirmed(location)
+            return "{} cardinalCheck hit {}".format(self.__class__, location)
         elif (attackInfo == "likelyCardinal") and (self.knowledge.array[location].entity != "hit"):
             self.knowledge.resetCardinalPriorities()
             self.knowledge.cardinalChecked(location)
+            return "{} cardinalCheck miss {}".format(self.__class__, location)
+        else:
+            return "{} {} {}".format(self.__class__, attackInfo, location)
 
     def attack(self):
         """Call attack on appropriate location"""
@@ -437,10 +484,14 @@ class AI(player):
         for index, item in enumerate(self.knowledge.array):
             if item.entity == highestPriority:
                 locationsToRandomise.append(index)
-        locationToAttack = random.choice(locationsToRandomise)
+        try:
+            locationToAttack = random.choice(locationsToRandomise)
+        except IndexError:
+            self.targetMap.displayMap(True)
+            return False
         hit = self.__callAttack(locationToAttack)
-        self.__updateKnowledge(locationToAttack, highestPriority)
-        return hit
+        logic = self.__updateKnowledge(locationToAttack, highestPriority)
+        return hit, logic
 
 
 class easyAI(AI):
@@ -498,9 +549,9 @@ class human(player):
 
     def __placeShip(self):
         """Place ship using information taken in."""
-        self.map.displayMap(False)
         while self.shipsLeft > 0:
             tempShip = ship(self.map)
+            self.map.displayMap(True)
             print("Remaining ship tiles needed : {}".format(self.shipsLeft))
             tempShip.location = self.map.array[inputInt("Where is the ship? ")]
             tempShip.orientation = inputStr("What is the orientation (V,H)? ", ["V", "H"])
@@ -522,18 +573,23 @@ class human(player):
         Take an input and attack using the given input, returns True is hit.
         :return: Bool
         """
-        self.targetMap.displayMap(False)
         while True:
+            print("Your Map :", end="\n")
+            self.map.displayMap(False)
+            print("\n\n", end="")
+            print("Opponents Map :", end="\n")
+            self.targetMap.displayMap(False)
+            print("\n\n", end="")
             attackLoc = inputInt("Where are you attacking {}? ".format(self.name))
             try:
                 if self.targetMap.array[attackLoc].attack() is True:
                     print("Hit!")
                     time.sleep(1)
-                    return True
+                    return True, "Hit {}".format(attackLoc)
                 else:
                     print("Miss")
                     time.sleep(1)
-                    return False
+                    return False, "Miss {}".format(attackLoc)
             except IndexError:
                 print("Value entered not on map")
 
@@ -576,6 +632,10 @@ class game(object):
             AIObject = hardAI(self.mapSize)
         return AIObject
 
+    def setTargetMaps(self):
+        self.playerOne.targetMap = self.playerTwo.map
+        self.playerTwo.targetMap = self.playerOne.map
+
     def setupGame(self):
         if self.gameConfig == "PP":
             self.playerOne = human(self.mapSize)
@@ -585,22 +645,25 @@ class game(object):
         if self.gameConfig == "PAI":
             self.playerOne = human(self.mapSize)
             cls()
-            self.playerTwo = self.setupAI(inputStr("What is the difficulty (E/M/H)", ["E", "M", "H"]))
+            self.playerTwo = self.setupAI(inputStr("What is the difficulty (E/M/H) ", ["E", "M", "H"]))
         if self.gameConfig == "AIAI":
-            self.playerOne = self.setupAI(inputStr("What is the difficulty (E/M/H)", ["E", "M", "H"]))
-            self.playerTwo = self.setupAI(inputStr("What is the difficulty (E/M/H)", ["E", "M", "H"]))
-        self.playerOne.targetMap = self.playerTwo.map
-        self.playerTwo.targetMap = self.playerOne.map
+            self.playerOne = self.setupAI(inputStr("What is the difficulty (E/M/H) ", ["E", "M", "H"]))
+            self.playerTwo = self.setupAI(inputStr("What is the difficulty (E/M/H) ", ["E", "M", "H"]))
+        self.setTargetMaps()
 
     def gameLoop(self):
         """
         Run through the game until someone wins, return their object.
         :return: Player.
         """
+        playerOneLogic = None
+        playerTwoLogic = None
         while True:
             while True:
                 cls()
-                if self.playerOne.attack() is False:
+                print(playerTwoLogic, end="\n\n")
+                playerOneHit, playerOneLogic = self.playerOne.attack()
+                if playerOneHit is False:
                     break
             self.playerTwo.map.displayMap(True)
             if self.playerTwo.map.hasShips() is False:
@@ -608,11 +671,36 @@ class game(object):
                 return self.playerOne
             while True:
                 cls()
-                if self.playerTwo.attack() is False:
+                print(playerOneLogic, end="\n\n")
+                playerTwoHit, playerTwoLogic = self.playerTwo.attack()
+                if playerTwoHit is False:
                     break
             self.playerOne.map.displayMap(True)
             if self.playerOne.map.hasShips() is False:
                 self.displayFinalScreen("{} has won!".format(self.playerTwo.name))
+                return self.playerTwo
+
+    def AILoop(self):
+        """
+        Run through the game until someone wins, with limited printing.
+        :return: Player.
+        """
+        while True:
+            while True:
+                playerOneHit, playerOneLogic = self.playerOne.attack()
+                print(playerOneLogic)
+                if playerOneHit is False:
+                    break
+            if self.playerTwo.map.hasShips() is False:
+                print("{} has won!".format(self.playerOne.__class__))
+                return self.playerOne
+            while True:
+                playerTwoHit, playerTwoLogic = self.playerTwo.attack()
+                print(playerTwoLogic)
+                if playerTwoHit is False:
+                    break
+            if self.playerOne.map.hasShips() is False:
+                print("{} has won!".format(self.playerTwo.__class__))
                 return self.playerTwo
 
 
@@ -667,10 +755,10 @@ def main():
         cycles = inputInt("What is the number of cycles? ")
         while True:
             try:
-                difficulty1Class = getattr(modules[__name__], input("What is the first AI's Class? "))(mapSize)
-                difficulty2Class = getattr(modules[__name__], input("What is the second AI's Class? "))(mapSize)
-                assert isinstance(difficulty1Class, AI)
-                assert isinstance(difficulty2Class, AI)
+                difficulty1Class = getattr(modules[__name__], input("What is the first AI's Class? "))
+                difficulty2Class = getattr(modules[__name__], input("What is the second AI's Class? "))
+                assert isinstance(difficulty1Class(mapSize), AI)
+                assert isinstance(difficulty2Class(mapSize), AI)
             except AttributeError:
                 print("Input is not a class")
             except (AssertionError, TypeError):
@@ -679,11 +767,10 @@ def main():
                 break
         for i in range(0, cycles):
             cyclesGame = game(mapSize, gameConfig)
-            cyclesGame.playerOne = cyclesGame.playerOne = deepcopy(difficulty1Class)
-            cyclesGame.playerTwo = cyclesGame.playerTwo = deepcopy(difficulty2Class)
-            cyclesGame.playerOne.targetMap = cyclesGame.playerTwo.map
-            cyclesGame.playerTwo.targetMap = cyclesGame.playerOne.map
-            winners.append(cyclesGame.gameLoop().__class__)
+            cyclesGame.playerOne = difficulty1Class(mapSize)
+            cyclesGame.playerTwo = difficulty2Class(mapSize)
+            cyclesGame.setTargetMaps()
+            winners.append(cyclesGame.AILoop().__class__)
         print("totals wins for {} : {}".format(difficulty1Class, winners.count(difficulty1Class.__class__)))
         print("totals wins for {} : {}".format(difficulty2Class, winners.count(difficulty2Class.__class__)))
 
