@@ -667,6 +667,7 @@ class game(object):
                     break
             self.playerTwo.map.displayMap(True)
             if self.playerTwo.map.hasShips() is False:
+                cls()
                 self.displayFinalScreen("{} has won!".format(self.playerOne.name))
                 return self.playerOne
             while True:
@@ -677,6 +678,7 @@ class game(object):
                     break
             self.playerOne.map.displayMap(True)
             if self.playerOne.map.hasShips() is False:
+                cls()
                 self.displayFinalScreen("{} has won!".format(self.playerTwo.name))
                 return self.playerTwo
 
