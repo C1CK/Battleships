@@ -309,9 +309,9 @@ class knowledgeMap(map_):
         for index, item in enumerate(self.array):
             if item.entity == "cardinalCheck":
                 item.entity = "impossible"
-            if item.hasVerticalShip() and (item.entity != "hit"):
+            if item.hasVerticalShip() and (item.entity != "hit") and (item.entity != "completedShip"):
                 item.entity = "impossible"
-            if item.hasHorizontalShip() and (item.entity != "hit"):
+            if item.hasHorizontalShip() and (item.entity != "hit") and (item.entity != "completedShip"):
                 item.entity = "shipCheck"
 
     def verticalShip(self):
@@ -319,9 +319,9 @@ class knowledgeMap(map_):
         for index, item in enumerate(self.array):
             if item.entity == "cardinalCheck":
                 item.entity = "impossible"
-            if item.hasHorizontalShip() and (item.entity != "hit"):
+            if item.hasHorizontalShip() and (item.entity != "hit") and (item.entity != "completedShip"):
                 item.entity = "impossible"
-            elif item.hasVerticalShip() and (item.entity != "hit"):
+            elif item.hasVerticalShip() and (item.entity != "hit") and (item.entity != "completedShip"):
                 item.entity = "shipCheck"
 
     def cardinalConfirmed(self, location):
@@ -773,8 +773,8 @@ def main():
             cyclesGame.playerTwo = difficulty2Class(mapSize)
             cyclesGame.setTargetMaps()
             winners.append(cyclesGame.AILoop().__class__)
-        print("totals wins for {} : {}".format(difficulty1Class, winners.count(difficulty1Class.__class__)))
-        print("totals wins for {} : {}".format(difficulty2Class, winners.count(difficulty2Class.__class__)))
+        print("totals wins for {} : {}".format(difficulty1Class, winners.count(difficulty1Class)))
+        print("totals wins for {} : {}".format(difficulty2Class, winners.count(difficulty2Class)))
 
 
 main()
